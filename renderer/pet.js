@@ -18,6 +18,8 @@ const CLICK_TIME_THRESHOLD = 400; // ms
 const IDLE_MIN = 3000;
 const IDLE_MAX = 9000;
 const REACT_DURATION = 2600;
+const CHAT_BUBBLE_DURATION = 8000;
+const THINKING_LINE = '…';
 // Zıplama yoyo: 770ms yukarı + 120ms dorukta + 770ms aşağı. Süre klibin
 // toplamıyla eşleşmeli, yoksa iniş yarıda kesilip pet havada IDLE'a döner.
 const JUMP_DURATION = 1660;
@@ -41,11 +43,14 @@ const GRAB_TOLERANCE = 3;
 class Pet {
   /**
    * @param {{ canvas: HTMLCanvasElement, bubbleCanvas: HTMLCanvasElement,
+   *           chatForm: HTMLFormElement, chatInput: HTMLInputElement,
    *           api: typeof window.petAPI }} deps
    */
-  constructor({ canvas, bubbleCanvas, api }) {
+  constructor({ canvas, bubbleCanvas, chatForm, chatInput, api }) {
     this.canvas = canvas;
     this.bubbleCanvas = bubbleCanvas;
+    this.chatForm = chatForm;
+    this.chatInput = chatInput;
     this.api = api;
     this.animator = new SpriteAnimator(canvas);
     this.pixelText = new PixelText();
@@ -89,6 +94,13 @@ class Pet {
     // Pencere tıklama geçirgen başlıyor (main.js). Bu bayrak main'e gereksiz IPC
     // göndermemek için son bilinen durumu tutuyor.
     this.interactive = false;
+
+    /** @type {{ model: string, systemPrompt?: string, bubbleSamples?: string[] } | null} */
+    this.llm = null;
+    /** @type {{ role: 'user' | 'assistant', content: string }[]} */
+    this.chatHistory = [];
+    this.chatOpen = false;
+    this.llmBusy = false;
   }
 
   /* ------------------------------ kurulum ------------------------------ */
@@ -155,6 +167,22 @@ class Pet {
     this.clips = clips;
     this.lines = meta.lines?.length ? meta.lines : ['...'];
     this.walkSpeed = meta.walkSpeed ?? 40;
+    this.llm = meta.llm?.model ? {
+      provider: meta.llm.provider || 'auto',
+      model: meta.llm.model,
+      fallback: meta.llm.fallback?.model ? meta.llm.fallback : null,
+      systemPrompt: meta.llm.systemPrompt,
+      bubbleSamples: meta.llm.bubbleSamples,
+      maxTokens: meta.llm.maxTokens,
+      temperature: meta.llm.temperature,
+      agent: meta.llm.agent?.enabled ? {
+        enabled: true,
+        maxToolRounds: meta.llm.agent.maxToolRounds
+      } : null
+    } : null;
+    this.chatHistory = [];
+    this.chatInput.placeholder = `${yonelmeEki(character.displayName)} yaz…`;
+    this.closeChat();
     this.wantedScale = requestedScale(character);
     this.scale = snapScale(this.wantedScale, this.dpr);
 
@@ -173,7 +201,9 @@ class Pet {
     this.contentTop = Math.min(...list.map((c) => c.content.top));
 
     // Replikler değiştiği için balon payı karakter başına yeniden ölçülüyor.
-    this.bubbleBox = this.bubble.enBuyukKutu(this.lines);
+    const balonMetinleri = [...this.lines];
+    if (this.llm?.bubbleSamples?.length) balonMetinleri.push(...this.llm.bubbleSamples);
+    this.bubbleBox = this.bubble.enBuyukKutu(balonMetinleri);
 
     await this.resizeWindowForCharacter();
     this.api.reportScale(this.scale);
@@ -333,7 +363,20 @@ class Pet {
       this.x = pos.x;
       this.y = pos.y;
       this.targetX = null;
+      this.closeChat();
       this.setState(STATE.IDLE);
+    });
+
+    this.chatForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.sendChat().catch((err) => console.error(err));
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.chatOpen) {
+        e.preventDefault();
+        this.closeChat();
+      }
     });
   }
 
@@ -567,6 +610,7 @@ class Pet {
 
   /** Pencereyi tıklanabilir/geçirgen yapar; yalnızca durum değişince IPC gönderir. */
   setInteractive(next) {
+    if (this.chatOpen) next = true;
     if (this.interactive === next) return;
     this.interactive = next;
     this.api.setInteractive(next);
@@ -649,11 +693,91 @@ class Pet {
       this.setState(STATE.JUMPING);
       return;                            // balon çıkarma, zıplama tek başına yeter
     }
-    const line = this.lines[Math.floor(Math.random() * this.lines.length)];
-    this.bubble.show(line, REACT_DURATION, this.direction === 'left' ? -1 : 1);
-    // REACTING'e girmek için önce state'i sıfırla (art arda tıklamada süre yenilensin)
+    if (this.llm) {
+      this.openChat();
+      return;
+    }
+    this.showBubbleLine(this.lines[Math.floor(Math.random() * this.lines.length)])
+      .catch((err) => console.error(err));
+  }
+
+  openChat() {
+    this.chatOpen = true;
+    this.chatForm.classList.remove('hidden');
+    this.chatInput.disabled = false;
+    this.setInteractive(true);
+    this.chatInput.focus();
+    if (this.state === STATE.WALKING) {
+      this.targetX = null;
+      this.setState(STATE.IDLE);
+    }
+  }
+
+  closeChat() {
+    this.chatOpen = false;
+    this.chatForm.classList.add('hidden');
+    this.chatInput.value = '';
+    this.chatInput.disabled = false;
+    this.llmBusy = false;
+    if (!this.drag) this.setInteractive(false);
+  }
+
+  /** @param {string} line @param {number} [duration] */
+  async showBubbleLine(line, duration = REACT_DURATION) {
+    const o = this.bubble.olc(line);
+    let buyudu = false;
+    if (o.genislik > this.bubbleBox.genislik) {
+      this.bubbleBox.genislik = o.genislik;
+      buyudu = true;
+    }
+    if (o.yukseklik > this.bubbleBox.yukseklik) {
+      this.bubbleBox.yukseklik = o.yukseklik;
+      buyudu = true;
+    }
+    if (buyudu) await this.resizeWindowForCharacter();
+
+    this.bubble.show(line, duration, this.direction === 'left' ? -1 : 1);
     this.state = STATE.IDLE;
     this.setState(STATE.REACTING);
+  }
+
+  async sendChat() {
+    if (!this.llm || this.llmBusy) return;
+    const text = this.chatInput.value.trim();
+    if (!text) return;
+
+    this.llmBusy = true;
+    this.chatInput.disabled = true;
+    this.chatHistory.push({ role: 'user', content: text });
+    this.chatInput.value = '';
+    await this.showBubbleLine(THINKING_LINE, CHAT_BUBBLE_DURATION);
+
+    const result = await this.api.llmChat({
+      provider: this.llm.provider,
+      model: this.llm.model,
+      fallback: this.llm.fallback,
+      systemPrompt: this.llm.systemPrompt,
+      messages: this.chatHistory,
+      maxTokens: this.llm.maxTokens,
+      temperature: this.llm.temperature,
+      agent: this.llm.agent
+    });
+
+    this.llmBusy = false;
+    this.chatInput.disabled = false;
+    this.chatInput.focus();
+
+    if (!result.ok) {
+      this.chatHistory.pop();
+      await this.showBubbleLine(result.error || 'Ollama hatası.', CHAT_BUBBLE_DURATION);
+      return;
+    }
+
+    this.chatHistory.push({ role: 'assistant', content: result.content });
+    if (this.chatHistory.length > 20) {
+      this.chatHistory = this.chatHistory.slice(-20);
+    }
+    await this.showBubbleLine(result.content, CHAT_BUBBLE_DURATION);
   }
 
   /* ------------------------------ yardımcı ------------------------------ */
@@ -741,10 +865,32 @@ function snapScale(requested, dpr) {
   return k / dpr;
 }
 
+/**
+ * "Ahmet" -> "Ahmet'e", "Ömerhan" -> "Ömerhan'a", "Ayşe" -> "Ayşe'ye".
+ *
+ * Ek ünlüsü son ünlünün kalınlığına göre seçilir; kelime ünlüyle bitiyorsa
+ * araya kaynaştırma "y"si girer. Hiç ünlü yoksa (ör. "G1") ince ek kullanılır.
+ */
+function yonelmeEki(ad) {
+  const harfler = ad.toLocaleLowerCase('tr');
+  const kalin = 'aıou';
+  const ince = 'eiöü';
+  let sonUnlu = '';
+  for (const h of harfler) {
+    if (kalin.includes(h) || ince.includes(h)) sonUnlu = h;
+  }
+  const ek = sonUnlu && kalin.includes(sonUnlu) ? 'a' : 'e';
+  const sonHarf = harfler[harfler.length - 1];
+  const kaynastirma = (kalin + ince).includes(sonHarf) ? 'y' : '';
+  return `${ad}'${kaynastirma}${ek}`;
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   const pet = new Pet({
     canvas: document.getElementById('pet'),
     bubbleCanvas: document.getElementById('bubble'),
+    chatForm: document.getElementById('chat'),
+    chatInput: document.getElementById('chat-input'),
     api: window.petAPI
   });
   // Regresyon testleri balonu tetikleyebilsin diye (npm run check:bubble).

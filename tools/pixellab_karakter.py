@@ -401,7 +401,7 @@ def meta_yaz(hedef: str, gosterilen: str, olcu: dict, replikler: list[str],
         "walkSpeed": YURUME_HIZI,
         "lines": replikler,
     }
-    with open(os.path.join(hedef, "meta.json"), "w") as f:
+    with open(os.path.join(hedef, "meta.json"), "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
         f.write("\n")
 

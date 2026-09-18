@@ -1,0 +1,40 @@
+{
+  "appId": "com.ardacelep.eylulpet",
+  "productName": "Eylül Pet",
+  "files": [
+    "main.js",
+    "preload.js",
+    "llm/**/*",
+    "renderer/**/*",
+    "characters/characters.json",
+    "characters/eylul/**/*"
+  ],
+  "extraResources": [
+    { "from": ".env.eylul", "to": ".env" }
+  ],
+  "win": {
+    "target": "nsis"
+  },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": false,
+    "createDesktopShortcut": "always",
+    "createStartMenuShortcut": true,
+    "runAfterFinish": true,
+    "shortcutName": "Eylül Pet"
+  },
+  "mac": {
+    "target": [
+      { "target": "dmg", "arch": ["universal"] }
+    ],
+    "category": "public.app-category.entertainment",
+    "hardenedRuntime": false,
+    "gatekeeperAssess": false
+  },
+  "dmg": {
+    "contents": [
+      { "x": 130, "y": 220 },
+      { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+    ]
+  }
+}

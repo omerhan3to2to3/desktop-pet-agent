@@ -58,7 +58,7 @@ async function calistir(win, _okuDurum, app) {
       kanvas: { w: b.width, h: b.height },
       css: { left: r.left, top: r.top, w: r.width, h: r.height },
       pencere: { w: innerWidth, h: innerHeight },
-      fontVar: document.fonts.check('10px PixelifySans'),
+      fontVar: document.fonts.check('600 12px PixelifySans'),
       alfa: { bos, tam, ara },
       petCss: (() => { const q = document.getElementById('pet').getBoundingClientRect();
                        return { left: q.left, top: q.top, w: q.width, h: q.height }; })()

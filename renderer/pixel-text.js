@@ -11,19 +11,20 @@
  * gerisi -> şeffaf), yani fontu çalışma anında bitmap'e çevir. Ölçekleme bundan
  * SONRA, karakterle aynı katsayıyla yapılır.
  *
- * FONT_PX neden 10: 6-8px'te eşikleme sonrası ı/İ/ğ/ş ayırt edilemiyor (ölçüldü,
- * render karşılaştırmasıyla). 10px ilk temiz boyut.
+ * FONT_PX neden 12: 10px eşikleme sonrası Türkçe karakterler (ı/İ/ğ/ş) zor
+ * ayırt ediliyordu; LLM sohbetinde uzun cümleler okunaksız kalıyordu.
  */
 
 const FONT_AILE = 'PixelifySans';
 const FONT_DOSYA = 'fonts/PixelifySans.ttf';
+const FONT_KALIN = 600;
 
 /** Native piksel cinsinden font boyutu. Ölçekleme bu değerin üstüne uygulanır. */
-const FONT_PX = 10;
-/** Satır aralığı (native px). Fontun 10px gövdesi + 2px nefes payı. */
-const SATIR_YUKSEKLIGI = 12;
+const FONT_PX = 12;
+/** Satır aralığı (native px). Font gövdesi + nefes payı. */
+const SATIR_YUKSEKLIGI = 15;
 /** Alfa eşiği: bunun altı tamamen şeffaf, üstü tamamen opak olur. */
-const ESIK = 110;
+const ESIK = 120;
 
 class PixelText {
   constructor() {
@@ -41,14 +42,14 @@ class PixelText {
     await f.load();
     document.fonts.add(f);
     // measureText'in doğru sonuç vermesi için font gerçekten hazır olmalı
-    await document.fonts.load(`${FONT_PX}px ${FONT_AILE}`);
-    this.olcek.font = `${FONT_PX}px ${FONT_AILE}`;
+    await document.fonts.load(`${FONT_KALIN} ${FONT_PX}px ${FONT_AILE}`);
+    this.olcek.font = `${FONT_KALIN} ${FONT_PX}px ${FONT_AILE}`;
     this.hazir = true;
   }
 
   /** @param {string} metin @returns {number} native px genişlik */
   satirGenisligi(metin) {
-    this.olcek.font = `${FONT_PX}px ${FONT_AILE}`;
+    this.olcek.font = `${FONT_KALIN} ${FONT_PX}px ${FONT_AILE}`;
     return Math.ceil(this.olcek.measureText(metin).width);
   }
 
@@ -102,7 +103,7 @@ class PixelText {
       this.ara.height = h;
     }
     this.araCtx.clearRect(0, 0, g, h);
-    this.araCtx.font = `${FONT_PX}px ${FONT_AILE}`;
+    this.araCtx.font = `${FONT_KALIN} ${FONT_PX}px ${FONT_AILE}`;
     this.araCtx.textBaseline = 'top';
     this.araCtx.fillStyle = '#000';
 

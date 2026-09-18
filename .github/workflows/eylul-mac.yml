@@ -1,0 +1,78 @@
+name: Eylül Pet — macOS kurulum dosyası
+
+# Elle tetiklenir: GitHub > Actions > "Eylül Pet — macOS kurulum dosyası" > Run workflow.
+#
+# DEPO HERKESE ACIK: public depoda Actions artifact'larini GitHub hesabi olan
+# herkes indirebilir. .dmg'nin icinde NVIDIA anahtari dogrudan durdugu icin
+# dosya sifrelenerek yukleniyor; sifresiz .dmg hicbir zaman artifact olarak
+# cikmiyor. Acmak icin (Git Bash):
+#
+#   openssl enc -d -aes-256-cbc -pbkdf2 -in EylulPet.dmg.enc -out "Eylul Pet.dmg"
+#
+# Gereken iki gizli deger (Settings > Secrets and variables > Actions):
+#   EYLUL_NVIDIA_API_KEY   nvapi-... anahtari
+#   EYLUL_ARTIFACT_SIFRE   artifact'i acmak icin sectigin sifre
+on:
+  workflow_dispatch:
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Gizli degerleri dogrula
+        run: |
+          [ -n "$EYLUL_NVIDIA_API_KEY" ] || { echo "::error::EYLUL_NVIDIA_API_KEY secret'i tanimli degil"; exit 1; }
+          [ -n "$EYLUL_ARTIFACT_SIFRE" ] || { echo "::error::EYLUL_ARTIFACT_SIFRE secret'i tanimli degil"; exit 1; }
+        env:
+          EYLUL_NVIDIA_API_KEY: ${{ secrets.EYLUL_NVIDIA_API_KEY }}
+          EYLUL_ARTIFACT_SIFRE: ${{ secrets.EYLUL_ARTIFACT_SIFRE }}
+
+      - name: .env.eylul olustur
+        run: printf 'NVIDIA_API_KEY=%s\n' "$EYLUL_NVIDIA_API_KEY" > .env.eylul
+        env:
+          EYLUL_NVIDIA_API_KEY: ${{ secrets.EYLUL_NVIDIA_API_KEY }}
+
+      - name: Derle
+        run: npm run dist:eylul:mac
+        env:
+          # Imza sertifikasi yok; electron-builder uygulamayi ad-hoc imzalar
+          # (Apple Silicon'da calismasi icin bu yeterli).
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      # Apple Silicon imzasiz uygulamayi acilista oldurur. Sertifika olmadiginda
+      # electron-builder ad-hoc imzalar; burada bunun gerceklestigini dogruluyoruz
+      # ki arkadasa acilmayan bir dosya gitmesin.
+      - name: Imza kontrolu
+        run: |
+          app=$(ls -d dist/*/*.app | head -n 1)
+          [ -n "$app" ] || { echo "::error::dist/ altinda .app bulunamadi"; exit 1; }
+          codesign -dv --verbose=2 "$app" 2>&1 | tee imza.txt
+          grep -Eq 'Signature=adhoc|^Authority=' imza.txt \
+            || { echo "::error::Uygulama imzalanmamis; Apple Silicon'da acilmaz"; exit 1; }
+
+      - name: .dmg dosyasini sifrele
+        run: |
+          dmg=$(ls dist/*.dmg | head -n 1)
+          [ -n "$dmg" ] || { echo "::error::dist/ altinda .dmg bulunamadi"; exit 1; }
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in "$dmg" -out EylulPet.dmg.enc -pass env:EYLUL_ARTIFACT_SIFRE
+          rm -f dist/*.dmg
+        env:
+          EYLUL_ARTIFACT_SIFRE: ${{ secrets.EYLUL_ARTIFACT_SIFRE }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Eylul-Pet-macOS-sifreli
+          path: EylulPet.dmg.enc
+          if-no-files-found: error
+          # Public depoda sifreli dosya bile gereksiz yere durmasin; indirdikten
+          # sonra artifact'i elle de silebilirsin.
+          retention-days: 1

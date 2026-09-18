@@ -1,7 +1,13 @@
-const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
+const { yukle: yukleEnv } = require('./llm/env');
+const { chat: llmChat, health: llmHealth, agentChat } = require('./llm/router');
+
+// Paketli uygulamada .env, resources/ altina (macOS'ta Contents/Resources)
+// extraResources ile kopyalaniyor; process.resourcesPath iki platformda da oraya bakar.
+yukleEnv(app.isPackaged ? process.resourcesPath : __dirname);
 
 const CHARACTERS_DIR = path.join(__dirname, 'characters');
 
@@ -392,6 +398,64 @@ ipcMain.on('pet:move', (_e, { x, y }) => {
 });
 
 ipcMain.on('pet:persist-position', persistPosition);
+
+ipcMain.handle('pet:llm-chat', async (_e, payload) => {
+  const {
+    provider,
+    model,
+    fallback,
+    systemPrompt,
+    messages,
+    maxTokens,
+    temperature,
+    agent
+  } = payload || {};
+
+  if (!model || typeof model !== 'string') {
+    return { ok: false, error: 'Geçersiz model adı.' };
+  }
+  if (!Array.isArray(messages)) {
+    return { ok: false, error: 'Geçersiz sohbet geçmişi.' };
+  }
+  const safe = messages
+    .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    .slice(-20)
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
+
+  const ortak = {
+    model,
+    systemPrompt: typeof systemPrompt === 'string' ? systemPrompt : undefined,
+    messages: safe,
+    maxTokens: Number.isFinite(maxTokens) ? maxTokens : 120,
+    temperature: Number.isFinite(temperature) ? temperature : 0.7
+  };
+
+  if (agent?.enabled) {
+    return agentChat({
+      ...ortak,
+      maxTokens: Number.isFinite(maxTokens) ? maxTokens : 256,
+      maxToolRounds: Number.isFinite(agent.maxToolRounds) ? agent.maxToolRounds : 5,
+      openPath: (p) => shell.openPath(p)
+    });
+  }
+
+  return llmChat({
+    provider: typeof provider === 'string' ? provider : 'auto',
+    model,
+    fallback: fallback?.model ? fallback : null,
+    ...ortak
+  });
+});
+
+ipcMain.handle('pet:llm-health', (_e, payload) => {
+  const { provider, model, fallbackModel } = payload || {};
+  if (!model || typeof model !== 'string') return { ok: false, error: 'Geçersiz model.' };
+  return llmHealth({
+    provider: typeof provider === 'string' ? provider : 'auto',
+    model,
+    fallbackModel: typeof fallbackModel === 'string' ? fallbackModel : undefined
+  });
+});
 
 ipcMain.on('pet:context-menu', () => {
   Menu.buildFromTemplate(buildMenuTemplate()).popup({ window: petWindow });

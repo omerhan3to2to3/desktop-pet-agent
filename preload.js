@@ -25,6 +25,12 @@ contextBridge.exposeInMainWorld('petAPI', {
   /** Sağ tık menüsünü aç. */
   openContextMenu: () => ipcRenderer.send('pet:context-menu'),
 
+  /** Yerel Ollama ile sohbet (yalnızca llm etkin karakterler). */
+  llmChat: (payload) => ipcRenderer.invoke('pet:llm-chat', payload),
+
+  /** Ollama + model hazır mı? */
+  llmHealth: (payload) => ipcRenderer.invoke('pet:llm-health', payload),
+
   /** Uygulanan ölçeği ana sürece bildir — sağ tık menüsündeki işaret için. */
   reportScale: (scale) => ipcRenderer.send('pet:scale-applied', scale),
 

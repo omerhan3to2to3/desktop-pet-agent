@@ -1,0 +1,47 @@
+{
+  "displayName": "Eylül",
+  "nativeFrameSize": 94,
+  "displayScale": 1.0,
+  "idle": {
+    "file": "idle_spritesheet.png",
+    "frameSize": 94,
+    "frameCount": 4,
+    "frameDuration": 500
+  },
+  "walk_right": {
+    "file": "walk_right_spritesheet.png",
+    "frameSize": 94,
+    "frameCount": 6,
+    "frameDuration": 120
+  },
+  "walk_left": {
+    "file": "walk_right_spritesheet.png",
+    "frameSize": 94,
+    "frameCount": 6,
+    "frameDuration": 120,
+    "flip": true
+  },
+  "walkSpeed": 42,
+  "llm": {
+    "provider": "nvidia",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "maxTokens": 256,
+    "temperature": 0.6,
+    "systemPrompt": "Sen masaustunde dolasan sevimli bir piksel pet'sin. Adin Eylül. Kullaniciyla akitici, dogal Turkce konusursun. Kisa, sicak cevaplar ver. Emoji kullanma.",
+    "agent": {
+      "enabled": false
+    },
+    "bubbleSamples": [
+      "Merhaba! Bugün sana nasıl yardımcı olabilirim?",
+      "Bağlantı kurulamadı. .env dosyanı kontrol et."
+    ]
+  },
+  "lines": [
+    "Selam!",
+    "Bugün nasılsın?",
+    "Bir mola versene.",
+    "Su içmeyi unutma.",
+    "Buradayım, merak etme.",
+    "Beni sürükleyebilirsin!"
+  ]
+}

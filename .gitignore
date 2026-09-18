@@ -25,6 +25,9 @@ venv/
 tools/test/
 assets/test
 
+# pixelart_extract --debug-dir ara ciktilari
+assets/**/debug/
+
 # İşletim sistemi
 .DS_Store
 Thumbs.db
@@ -38,6 +41,9 @@ desktop.ini
 # Yerel ortam
 .env
 .env.local
+
+# Dagitim yapilan kuruluma gomulen anahtar dosyasi — repoya girmemeli.
+.env.eylul
 
 # Poz modeli veri seti — uretilmis, buyuk, ve etiketleri ucretli API'den geliyor.
 # Onbellek dizini sayesinde yeniden uretmek ucretsiz.

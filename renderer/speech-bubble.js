@@ -15,10 +15,10 @@
 /** 9-slice köşe boyutu (native px) — bubble.png 32x12 içinde 5px köşe. */
 const KOSE = 5;
 /** Metin ile çerçeve arası iç boşluk (native px). */
-const IC_PAY_X = 5;
-const IC_PAY_Y = 4;
-/** Balonun taşabileceği azami native genişlik. */
-const MAX_GENISLIK = 104;
+const IC_PAY_X = 6;
+const IC_PAY_Y = 5;
+/** Balonun taşabileceği azami native genişlik (metin alanı). */
+const MAX_GENISLIK = 176;
 
 const RENK_METIN = [43, 43, 58];
 

@@ -22,13 +22,29 @@
     "flip": true
   },
   "walkSpeed": 42,
+  "llm": {
+    "provider": "nvidia",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "maxTokens": 256,
+    "temperature": 0.6,
+    "systemPrompt": "Sen masaustunde dolasan sevimli bir piksel pet'sin. Adin Omerhan. Kullaniciyla akitici, dogal Turkce konusursun. Kisa, sicak cevaplar ver. Emoji kullanma.",
+    "agent": {
+      "enabled": true,
+      "maxToolRounds": 5
+    },
+    "bubbleSamples": [
+      "Merhaba! Bugun sana nasil yardimci olabilirim?",
+      "Notunu kaydettim, baska bir sey var mi?",
+      "Baglanti kurulamadi. .env dosyani kontrol et."
+    ]
+  },
   "lines": [
     "Selam!",
-    "Bugün nasılsın?",
+    "Bugun nasilsin?",
     "Bir mola versene.",
-    "Su içmeyi unutma.",
-    "Kod hâlâ derlenmedi mi?",
-    "Buradayım, merak etme.",
-    "Beni sürükleyebilirsin!"
+    "Su icmeyi unutma.",
+    "Kod hala derlenmedi mi?",
+    "Buradayim, merak etme.",
+    "Beni surukleyebilirsin!"
   ]
 }
