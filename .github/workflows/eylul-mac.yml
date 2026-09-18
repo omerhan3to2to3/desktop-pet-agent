@@ -49,9 +49,10 @@ jobs:
           # electron-builder sertifika bulamayinca ad-hoc'a DUSMUYOR, tamamen atliyor.
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
-      # Apple Silicon imzasiz/bozuk imzali uygulamayi acilista oldurur. Kancanin
-      # attigi ad-hoc imzanin hem var hem GECERLI oldugunu dogruluyoruz ki
-      # arkadasa acilmayan bir dosya gitmesin.
+      # Apple Silicon imzasiz/bozuk imzali uygulamayi acilista oldurur; macOS 26
+      # ayrica JIT yetkisi olmayan Electron'u V8 baslarken dusuruyor ("trace
+      # trap"). Kancanin attigi imzanin var, GECERLI ve YETKILI oldugunu
+      # dogruluyoruz ki arkadasa acilmayan bir dosya gitmesin.
       - name: Imza kontrolu
         run: |
           app=$(ls -d dist/*/*.app | head -n 1)
@@ -59,8 +60,19 @@ jobs:
           codesign -dv --verbose=2 "$app" 2>&1 | tee imza.txt
           grep -q 'Signature=adhoc' imza.txt \
             || { echo "::error::Ad-hoc imza bulunamadi; Apple Silicon'da acilmaz"; exit 1; }
+          grep -q 'flags=.*runtime' imza.txt \
+            || { echo "::error::Hardened runtime kapali; yetkiler etkisiz kalir"; exit 1; }
           codesign --verify --deep --strict --verbose=2 "$app" \
             || { echo "::error::Imza gecersiz; Apple Silicon'da acilmaz"; exit 1; }
+          codesign -d --entitlements - --xml "$app" 2>/dev/null | tee yetkiler.txt
+          for y in allow-jit allow-unsigned-executable-memory disable-library-validation; do
+            grep -q "com.apple.security.cs.$y" yetkiler.txt \
+              || { echo "::error::Yetki eksik: $y — macOS 26'da V8 baslarken coker"; exit 1; }
+          done
+          # Yardimci surecler de ayni yetkileri tasimali (renderer/GPU JIT kullaniyor)
+          helper=$(ls -d "$app"/Contents/Frameworks/*Helper*.app | head -n 1)
+          codesign -d --entitlements - --xml "$helper" 2>/dev/null | grep -q allow-jit \
+            || { echo "::error::Yardimci uygulamada JIT yetkisi yok: $helper"; exit 1; }
 
       - name: .dmg dosyasini sifrele
         run: |
