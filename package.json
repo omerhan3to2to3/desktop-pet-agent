@@ -16,8 +16,8 @@
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
-    "dist:eylul:win": "electron-builder --win --config electron-builder.eylul.json",
-    "dist:eylul:mac": "electron-builder --mac --config electron-builder.eylul.json",
+    "dist:eylul:win": "electron-builder --win --config electron-builder.eylul.json --publish never",
+    "dist:eylul:mac": "electron-builder --mac --config electron-builder.eylul.json --publish never",
     "etiketle": "python3 tools/skeleton_edit.py --klasor _data/lpc_etiket/gorseller"
   },
   "dependencies": {

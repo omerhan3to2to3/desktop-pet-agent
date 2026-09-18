@@ -44,20 +44,23 @@ jobs:
       - name: Derle
         run: npm run dist:eylul:mac
         env:
-          # Imza sertifikasi yok; electron-builder uygulamayi ad-hoc imzalar
-          # (Apple Silicon'da calismasi icin bu yeterli).
+          # Sertifika yok; electron-builder'in kendi imzalama adimini kapatiyoruz.
+          # Asil imzayi tools/mac-adhoc-sign.js (afterPack kancasi) atiyor —
+          # electron-builder sertifika bulamayinca ad-hoc'a DUSMUYOR, tamamen atliyor.
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
-      # Apple Silicon imzasiz uygulamayi acilista oldurur. Sertifika olmadiginda
-      # electron-builder ad-hoc imzalar; burada bunun gerceklestigini dogruluyoruz
-      # ki arkadasa acilmayan bir dosya gitmesin.
+      # Apple Silicon imzasiz/bozuk imzali uygulamayi acilista oldurur. Kancanin
+      # attigi ad-hoc imzanin hem var hem GECERLI oldugunu dogruluyoruz ki
+      # arkadasa acilmayan bir dosya gitmesin.
       - name: Imza kontrolu
         run: |
           app=$(ls -d dist/*/*.app | head -n 1)
           [ -n "$app" ] || { echo "::error::dist/ altinda .app bulunamadi"; exit 1; }
           codesign -dv --verbose=2 "$app" 2>&1 | tee imza.txt
-          grep -Eq 'Signature=adhoc|^Authority=' imza.txt \
-            || { echo "::error::Uygulama imzalanmamis; Apple Silicon'da acilmaz"; exit 1; }
+          grep -q 'Signature=adhoc' imza.txt \
+            || { echo "::error::Ad-hoc imza bulunamadi; Apple Silicon'da acilmaz"; exit 1; }
+          codesign --verify --deep --strict --verbose=2 "$app" \
+            || { echo "::error::Imza gecersiz; Apple Silicon'da acilmaz"; exit 1; }
 
       - name: .dmg dosyasini sifrele
         run: |

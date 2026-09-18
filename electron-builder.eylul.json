@@ -12,6 +12,7 @@
   "extraResources": [
     { "from": ".env.eylul", "to": ".env" }
   ],
+  "afterPack": "tools/mac-adhoc-sign.js",
   "win": {
     "target": "nsis"
   },
